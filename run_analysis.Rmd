@@ -1,0 +1,81 @@
+---
+title: "Data Wrangling Project"
+author: "Tom Gocken"
+date: "Tuesday, January 12, 2016"
+output: html_document
+---
+
+### Step 1: Load datasets
+- Data for counties of interest was queried from http://wonder.cdc.gov/EnvironmentalData.html
+- Each environmental data type was downloaded in its own tab-delimited file and a dataset was created for each file.
+```{r}
+airtemp <- read.delim("data/Air Temperature.txt")
+precip <- read.delim("data/Precipitation.txt")
+sunlight <- read.delim("data/Sunlight.txt")
+surfacetemp <- read.delim("data/Surface Temperature.txt")
+```
+
+### Step 2: Manage NA's
+- **dplyr** package loaded for next steps:
+```{r message=FALSE}
+library(dplyr)
+```
+
+- Missing numeric values from certain columns in original files were populated with the string "Missing".
+- "Missing" strings were converted to NA using **type.convert** function.
+
+```{r}
+airtemp <- mutate(airtemp, heat_index = 
+                  type.convert(as.character(Avg.Daily.Max.Heat.Index..F.), 
+                  na.strings = "Missing")
+                  )                                          
+surfacetemp <- mutate(surfacetemp, day_surface_temp = 
+                  type.convert(as.character(Avg.Day.Land.Surface.Temperature..F.), 
+                  na.strings = "Missing"),
+                  night_surface_temp =
+                  type.convert(as.character(Avg.Night.Land.Surface.Temperature..F.), 
+                  na.strings = "Missing")
+                  )
+```
+
+Note: The same result could have been accomplished using **gsub** function:
+
+    airtemp <- mutate(airtemp, heat_index = as.numeric(gsub("Missing", NA, as.character((airtemp$Avg.Daily.Max.Heat.Index..F.)))))
+
+### Step 3: Join data into a single tidy dataset
+- Rows from individual datasets represent unique county/date observations. To ensure that all rows from every dataset were included in the combined dataset, full joins were used.
+- Except for environmental data columns, variables were named consistently in downloaded files. As a result, natural joins on all variables with common names were possible without the need for a "by" argument.
+
+
+```{r}
+joindat <- full_join(airtemp, precip)
+joindat <- full_join(joindat, sunlight)
+joindat <- full_join(joindat, surfacetemp)
+```
+Date variable was created by concatenating year, month, and day columns and coverting to date class.
+```{r}
+joindat <- mutate(joindat, Date = as.Date(paste(joindat$Year.Code, joindat$Month.Code, joindat$Day.of.Month.Code, sep="-")))
+```
+Select statement used to assign consise variable names in common format to columms of interest.
+```{r}
+envdat <- select(joindat,
+                 county = County,
+                 year = Year,
+                 day_of_yr = Day.of.Year,
+                 date = Date,
+                 max_air_temp = Avg.Daily.Max.Air.Temperature..F.,
+                 min_air_temp = Avg.Daily.Min.Air.Temperature..F.,
+                 heat_index,
+                 precip = Avg.Daily.Precipitation..mm.,
+                 sunlight = Avg.Daily.Sunlight..KJ.m².,
+                 day_surface_temp,
+                 night_surface_temp
+                 )
+```
+
+### Step 4: Summarize and view data (UNDER CONSTRUCTION)
+```{r}
+summary(envdat)
+```
+
+...add some descriptive graphs...

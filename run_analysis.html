@@ -100,7 +100,8 @@ surfacetemp &lt;- mutate(surfacetemp, day_surface_temp =
                   na.strings = &quot;Missing&quot;)
                   )</code></pre>
 <p>Note: The same result could have been accomplished using <strong>gsub</strong> function:</p>
-<pre><code>airtemp &lt;- mutate(airtemp, heat_index = as.numeric(gsub(&quot;Missing&quot;, NA, as.character((airtemp$Avg.Daily.Max.Heat.Index..F.)))))</code></pre>
+<pre><code>airtemp &lt;- mutate(airtemp, heat_index = as.numeric(gsub(&quot;Missing&quot;, NA, 
+as.character((airtemp$Avg.Daily.Max.Heat.Index..F.)))))</code></pre>
 </div>
 <div id="step-3-join-data-into-a-single-tidy-dataset" class="section level3">
 <h3>Step 3: Join data into a single tidy dataset</h3>
@@ -130,6 +131,15 @@ surfacetemp &lt;- mutate(surfacetemp, day_surface_temp =
                  day_surface_temp,
                  night_surface_temp
                  )</code></pre>
+<p>Growing degree units (GDUs), also known as growing degree days, were calculated by taking the average of the daily maximum and minimum temperatures compared to a base temperature, T(base), as follows:</p>
+<p>GDU = ((T(max) + T(min)) / 2) - T(base)</p>
+<p>where T(max) is equal to the maximum daily temperature but not greater than a defined upper limit and T(min) is equal to the maximum daily temperature but not less than the base temperature. The upper limit and base in this project were set to 50°F and 86°F (10°C and 50°C), respectively, typical values for corn.</p>
+<p>Accumulated GDUs (AGDUs) were calculated using the <strong>cumsum</strong> function grouped by county and year and ordered by date. AGDUs provide a standard measure of accumulated heat during a growing season. The maturity of a plant variety is often expressed in AGDUs after planting, rather than the number days, which vary by location and season.</p>
+<p>References:<br /><a href="http://en.wikipedia.org/wiki/Growing_degree-day" class="uri">http://en.wikipedia.org/wiki/Growing_degree-day</a><br /><a href="http://agron-www.agron.iastate.edu/Courses/agron212/Calculations/GDD.htm" class="uri">http://agron-www.agron.iastate.edu/Courses/agron212/Calculations/GDD.htm</a></p>
+<pre class="r"><code>envdat &lt;- mutate(envdat, gdu = ifelse(max_air_temp &lt; 50, 0, # negative values set to 0
+                                      (((ifelse(max_air_temp &gt; 86, 86, max_air_temp) 
+                                      + ifelse(min_air_temp &lt; 50, 50, min_air_temp)) / 2) - 50)))
+envdat &lt;- transform(envdat, agdu = ave(gdu, paste(county, year), FUN = cumsum))</code></pre>
 </div>
 <div id="step-4-summarize-and-view-data-under-construction" class="section level3">
 <h3>Step 4: Summarize and view data (UNDER CONSTRUCTION)</h3>
@@ -157,7 +167,15 @@ surfacetemp &lt;- mutate(surfacetemp, day_surface_temp =
 ##  Mean   :  2.754   Mean   :14768   Mean   : 63.88   Mean   : 39.20    
 ##  3rd Qu.:  1.900   3rd Qu.:20725   3rd Qu.: 81.42   3rd Qu.: 55.77    
 ##  Max.   :133.900   Max.   :30876   Max.   :108.53   Max.   : 77.10    
-##                                    NA's   :28644    NA's   :28042</code></pre>
+##                                    NA's   :28644    NA's   :28042     
+##       gdu              agdu        
+##  Min.   : 0.000   Min.   :   0.00  
+##  1st Qu.: 0.000   1st Qu.:  83.41  
+##  Median : 6.185   Median :1275.78  
+##  Mean   : 9.547   Mean   :1577.38  
+##  3rd Qu.:18.200   3rd Qu.:2916.39  
+##  Max.   :35.035   Max.   :4957.62  
+## </code></pre>
 <p>…add some descriptive graphs…</p>
 </div>
 

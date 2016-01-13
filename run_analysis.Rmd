@@ -40,7 +40,8 @@ surfacetemp <- mutate(surfacetemp, day_surface_temp =
 
 Note: The same result could have been accomplished using **gsub** function:
 
-    airtemp <- mutate(airtemp, heat_index = as.numeric(gsub("Missing", NA, as.character((airtemp$Avg.Daily.Max.Heat.Index..F.)))))
+    airtemp <- mutate(airtemp, heat_index = as.numeric(gsub("Missing", NA, 
+    as.character((airtemp$Avg.Daily.Max.Heat.Index..F.)))))
 
 ### Step 3: Join data into a single tidy dataset
 - Rows from individual datasets represent unique county/date observations. To ensure that all rows from every dataset were included in the combined dataset, full joins were used.
@@ -71,6 +72,24 @@ envdat <- select(joindat,
                  day_surface_temp,
                  night_surface_temp
                  )
+```
+
+Growing degree units (GDUs), also known as growing degree days, were calculated by taking the average of the daily maximum and minimum temperatures compared to a base temperature, T(base), as follows:
+
+  GDU = ((T(max) + T(min)) / 2) - T(base)
+
+where T(max) is equal to the maximum daily temperature but not greater than a defined upper limit and T(min) is equal to the maximum daily temperature but not less than the base temperature. The upper limit and base in this project were set to 50°F and 86°F (10°C and 50°C), respectively, typical values for corn.
+
+Accumulated GDUs (AGDUs) were calculated using the **cumsum** function grouped by county and year and ordered by date. AGDUs provide a standard measure of accumulated heat during a growing season. The maturity of a plant variety is often expressed in AGDUs after planting, rather than the number days, which vary by location and season.
+
+References:  
+http://en.wikipedia.org/wiki/Growing_degree-day  
+http://agron-www.agron.iastate.edu/Courses/agron212/Calculations/GDD.htm
+```{r}
+envdat <- mutate(envdat, gdu = ifelse(max_air_temp < 50, 0, # negative values set to 0
+                                      (((ifelse(max_air_temp > 86, 86, max_air_temp) 
+                                      + ifelse(min_air_temp < 50, 50, min_air_temp)) / 2) - 50)))
+envdat <- transform(envdat, agdu = ave(gdu, paste(county, year), FUN = cumsum))
 ```
 
 ### Step 4: Summarize and view data (UNDER CONSTRUCTION)

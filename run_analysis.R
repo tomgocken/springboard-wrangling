@@ -64,16 +64,21 @@ envdat <- select(joindat,
 
 # Growing degree days (gdd) and accumulated growing degree days (agdd) created from 
 # min and max air temps.
-envdat <- mutate(envdat, gdd = ifelse(max_air_temp < 50, 0, # exclude negative values
-                                        (((ifelse(max_air_temp > 86, 86, max_air_temp) 
-                                           + ifelse(min_air_temp < 50, 50, min_air_temp)) / 2) - 50)))
-envdat <- transform(envdat, agdd = ave(gdd, paste(county, year), FUN = cumsum))
+envdat <- mutate(envdat, gdu = ifelse(max_air_temp < 50, 0, # negative values set to 0
+                                      (((ifelse(max_air_temp > 86, 86, max_air_temp) 
+                                         + ifelse(min_air_temp < 50, 50, min_air_temp)) / 2) - 50)))
+envdat <- transform(envdat, agdu = ave(gdu, paste(county, year), FUN = cumsum))
 
 # Step 4: Summarize and view data (UNDER CONSTRUCTION)
 summary(envdat)
 # write.csv(envdat, "envdat.csv", row.names=FALSE, na="")
 # ...add some descriptive graphs...
 library(ggplot2)
-g <- filter(envdat, year > 2008)
-g$year <- as.factor(g$year)
-qplot(county, max_air_temp, data = g, geom = "boxplot", facets = year ~ .)
+
+graph_3yr <- filter(envdat, year %in% c(2009, 2010, 2011))
+graph_3yr$year <- as.factor(graph_3yr$year)
+qplot(county, max_air_temp, data = graph_3yr, geom = "boxplot", facets = year ~ .)
+
+graph_2011 <- filter(envdat, year == 2011)
+qplot(date, agdu, data = graph_2011, geom = "line", color = county) + geom_line(size = 1.0)
+

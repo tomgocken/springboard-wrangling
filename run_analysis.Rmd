@@ -16,7 +16,7 @@ surfacetemp <- read.delim("data/Surface Temperature.txt")
 ```
 
 ### Step 2: Manage NA's
-- **dplyr** package loaded for next steps:
+- **dplyr** package loaded for wrangling functions.
 ```{r message=FALSE}
 library(dplyr)
 ```
@@ -76,11 +76,11 @@ envdat <- select(joindat,
 
 Growing degree units (GDUs), also known as growing degree days, were calculated by taking the average of the daily maximum and minimum temperatures compared to a base temperature, T(base), as follows:
 
-  GDU = ((T(max) + T(min)) / 2) - T(base)
+GDU = ((T(max) + T(min)) / 2) - T(base)
 
 where T(max) is equal to the maximum daily temperature but not greater than a defined upper limit and T(min) is equal to the maximum daily temperature but not less than the base temperature. The upper limit and base in this project were set to 50°F and 86°F (10°C and 50°C), respectively, typical values for corn.
 
-Accumulated GDUs (AGDUs) were calculated using the **cumsum** function grouped by county and year and ordered by date. AGDUs provide a standard measure of accumulated heat during a growing season. The maturity of a plant variety is often expressed in AGDUs after planting, rather than the number days, which vary by location and season.
+Accumulated GDUs (AGDUs) were calculated using the **cumsum** function grouped by county and year and ordered by date. AGDUs provide a standard measure of accumulated heat during a growing season. The maturity of a plant variety is often expressed in AGDUs after planting, rather than days, since days to maturity vary by location and season.
 
 References:  
 http://en.wikipedia.org/wiki/Growing_degree-day  
@@ -97,4 +97,15 @@ envdat <- transform(envdat, agdu = ave(gdu, paste(county, year), FUN = cumsum))
 summary(envdat)
 ```
 
-...add some descriptive graphs...
+Box plot and line graphs created using **ggplot2** library show differences by year and county.
+```{r}
+library(ggplot2)
+
+graph_3yr <- filter(envdat, year %in% c(2009, 2010, 2011))
+graph_3yr$year <- as.factor(graph_3yr$year)
+qplot(county, max_air_temp, data = graph_3yr, geom = "boxplot", facets = year ~ .)
+
+graph_2011 <- filter(envdat, year == 2011)
+qplot(date, agdu, data = graph_2011, geom = "line", color = county) + geom_line(size = 1.0)
+```
+

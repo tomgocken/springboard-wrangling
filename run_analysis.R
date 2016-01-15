@@ -72,13 +72,28 @@ envdat <- transform(envdat, agdu = ave(gdu, paste(county, year), FUN = cumsum))
 # Step 4: Summarize and view data (UNDER CONSTRUCTION)
 summary(envdat)
 # write.csv(envdat, "envdat.csv", row.names=FALSE, na="")
-# ...add some descriptive graphs...
+
+# Differences in max air temp by year and county:
 library(ggplot2)
+envdat_3yr <- filter(envdat, year %in% c(2009, 2010, 2011))
+envdat_3yr$year <- as.factor(envdat_3yr$year)
+qplot(county, max_air_temp, data = envdat_3yr, geom = "boxplot", facets = year ~ .)
 
-graph_3yr <- filter(envdat, year %in% c(2009, 2010, 2011))
-graph_3yr$year <- as.factor(graph_3yr$year)
-qplot(county, max_air_temp, data = graph_3yr, geom = "boxplot", facets = year ~ .)
+# Differences in accumulated GDUs by county:
+yr_means <- envdat %>%
+  filter(day_of_yr != 366) %>% # exclude extra leap year day
+  group_by(county, day_of_yr) %>%
+  summarize(agdu_mean = mean(agdu))
+qplot(day_of_yr, agdu_mean, data = yr_means, geom = "line", color = county, 
+      xlab = "Day of Year", ylab = "Mean Accumulated GDUs") + geom_line(size = 1.0)
 
-graph_2011 <- filter(envdat, year == 2011)
-qplot(date, agdu, data = graph_2011, geom = "line", color = county) + geom_line(size = 1.0)
-
+# Differences in accumulated GDUs by 5-year group means:
+envdat <- mutate(envdat, yr_group = ifelse(year < 1997, "1992-1996",
+                                           ifelse(year < 2002, "1997-2001",
+                                                  ifelse(year < 2007, "2002-2006", "2007-2011"))))
+county_means <- envdat %>%
+  filter(day_of_yr != 366) %>% # exclude extra leap year day
+  group_by(yr_group, day_of_yr) %>%
+  summarize(agdu_mean = mean(agdu))
+qplot(day_of_yr, agdu_mean, data = county_means, geom = "line", color = yr_group, 
+      xlab = "Day of Year", ylab = "Mean Accumulated GDUs") + geom_line(size = 1.0)

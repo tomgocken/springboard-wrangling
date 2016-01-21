@@ -1,10 +1,12 @@
 ---
 title: "Data Wrangling Project"
 author: "Tom Gocken"
-date: "Tuesday, January 12, 2016"
+date: "Wednesday, January 20, 2016"
 output:
-  html_document:
-    fig_caption: yes
+  html_document: default
+  pdf_document: default
+  word_document:
+    fig_width: 7
 ---
 
 ### Step 1: Load datasets
@@ -15,6 +17,7 @@ airtemp <- read.delim("data/Air Temperature.txt")
 precip <- read.delim("data/Precipitation.txt")
 sunlight <- read.delim("data/Sunlight.txt")
 surfacetemp <- read.delim("data/Surface Temperature.txt")
+particulate <- read.delim("data/Particulate Matter.txt")
 ```
 
 ### Step 2: Manage NA's
@@ -54,25 +57,30 @@ Note: The same result could have been accomplished using **gsub** function:
 joindat <- full_join(airtemp, precip)
 joindat <- full_join(joindat, sunlight)
 joindat <- full_join(joindat, surfacetemp)
+joindat <- full_join(joindat, particulate)
 ```
 Date variable was created by concatenating year, month, and day columns and coverting to date class.
 ```{r}
-joindat <- mutate(joindat, Date = as.Date(paste(joindat$Year.Code, joindat$Month.Code, joindat$Day.of.Month.Code, sep="-")))
+joindat <- mutate(joindat, date = as.Date(paste(joindat$Year.Code, 
+                                                joindat$Month.Code, 
+                                                joindat$Day.of.Month.Code, 
+                                                sep="-")))
 ```
-Select statement used to assign consise variable names in common format to columms of interest.
+Select statement used to assign concise variable names in common format to columms of interest.
 ```{r}
 envdat <- select(joindat,
                  county = County,
                  year = Year,
                  day_of_yr = Day.of.Year,
-                 date = Date,
+                 date,
                  max_air_temp = Avg.Daily.Max.Air.Temperature..F.,
                  min_air_temp = Avg.Daily.Min.Air.Temperature..F.,
                  heat_index,
                  precip = Avg.Daily.Precipitation..mm.,
                  sunlight = Avg.Daily.Sunlight..KJ.m².,
                  day_surface_temp,
-                 night_surface_temp
+                 night_surface_temp,
+                 particulate_matter = Avg.Fine.Particulate.Matter..µg.m³.
                  )
 ```
 
@@ -88,13 +96,14 @@ References:
 http://en.wikipedia.org/wiki/Growing_degree-day  
 http://agron-www.agron.iastate.edu/Courses/agron212/Calculations/GDD.htm
 ```{r}
-envdat <- mutate(envdat, gdu = ifelse(max_air_temp < 50, 0, # negative values set to 0
-                                      (((ifelse(max_air_temp > 86, 86, max_air_temp) 
-                                      + ifelse(min_air_temp < 50, 50, min_air_temp)) / 2) - 50)))
-envdat <- transform(envdat, agdu = ave(gdu, paste(county, year), FUN = cumsum))
+envdat <- mutate(envdat, gdu = ifelse(max_air_temp < 50, 0,
+                 (((ifelse(max_air_temp > 86, 86, max_air_temp) 
+                 + ifelse(min_air_temp < 50, 50, min_air_temp)) / 2) - 50)))
+envdat <- transform(envdat, agdu = ave(gdu, paste(county, year), 
+                                       FUN = cumsum))
 ```
 
-### Step 4: Summarize and view data (UNDER CONSTRUCTION)
+### Step 4: Summarize and view data
 ```{r}
 summary(envdat)
 ```
@@ -105,32 +114,35 @@ library(ggplot2)
 
 ```
 
-Differences in max air temp by year and county:
+Differences in max air temp by year and county (2009-2011):
 ```{r}
 envdat_3yr <- filter(envdat, year %in% c(2009, 2010, 2011))
 envdat_3yr$year <- as.factor(envdat_3yr$year)
-qplot(county, max_air_temp, data = envdat_3yr, geom = "boxplot", facets = year ~ .)
+qplot(county, max_air_temp, data = envdat_3yr, geom = "boxplot", 
+      facets = year ~ .)
 ```
 
-Differences in accumulated GDUs by county:
+Differences in accumulated GDUs by county, across years:
 ```{r}
-yr_means <- envdat %>%
+county_means <- envdat %>%
   filter(day_of_yr != 366) %>% # exclude extra leap year day
   group_by(county, day_of_yr) %>%
   summarize(agdu_mean = mean(agdu))
-qplot(day_of_yr, agdu_mean, data = yr_means, geom = "line", color = county, 
+qplot(day_of_yr, agdu_mean, data = county_means, geom = "line", color = county, 
       xlab = "Day of Year", ylab = "Mean Accumulated GDUs") + geom_line(size = 1.0)
 ```
 
-Differences in accumulated GDUs by 5-year means:
+Differences in accumulated GDUs by 5-year means, across counties:
 ```{r}
 envdat <- mutate(envdat, yr_group = ifelse(year < 1997, "1992-1996",
-                                           ifelse(year < 2002, "1997-2001",
-                                                  ifelse(year < 2007, "2002-2006", "2007-2011"))))
-county_means <- envdat %>%
+                                      ifelse(year < 2002, "1997-2001",
+                                        ifelse(year < 2007, "2002-2006",
+                                          "2007-2011"))))
+yr_means <- envdat %>%
   filter(day_of_yr != 366) %>% # exclude extra leap year day
   group_by(yr_group, day_of_yr) %>%
   summarize(agdu_mean = mean(agdu))
-qplot(day_of_yr, agdu_mean, data = county_means, geom = "line", color = yr_group, 
-      xlab = "Day of Year", ylab = "Mean Accumulated GDUs") + geom_line(size = 1.0)
+qplot(day_of_yr, agdu_mean, data = yr_means, geom = "line", 
+      color = yr_group, xlab = "Day of Year", 
+      ylab = "Mean Accumulated GDUs") + geom_line(size = 1.0)
 ```

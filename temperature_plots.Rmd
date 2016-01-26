@@ -1,0 +1,54 @@
+---
+title: "Temperature Plots"
+author: "Tom Gocken"
+date: "Tuesday, January 26, 2016"
+output:
+  word_document:
+    fig_width: 7
+---
+
+### Load previously created tidy dataset, envdat
+```{r}
+envdat <- read.delim("C:/Projects/data/envdat.txt")
+```
+
+### Create by month and by year datasets
+```{r}
+library(dplyr)
+
+envdat$yr_mo <- envdat$year + envdat$month / 12
+
+envdat_by_month <- envdat %>%
+  group_by(yr_mo) %>%
+  summarize(max_air_temp_mean = mean(max_air_temp),
+            max_air_temp_median = median(max_air_temp),
+            n = n()) %>%
+  arrange(yr_mo)
+
+envdat_by_year <- envdat %>%
+  group_by(year) %>%
+  summarize(max_air_temp_mean = mean(max_air_temp),
+            max_air_temp_median = median(max_air_temp),
+            n = n()) %>%
+  arrange(year)
+```
+
+### Plot raw max temp air data, by month data, and by year data
+```{r}
+library(ggplot2)
+library(gridExtra)
+
+p1 <- ggplot(aes(x = date, y = max_air_temp), data = envdat) + geom_point(alpha = 1/20)
+p2 <- ggplot(aes(x = yr_mo, y = max_air_temp_mean), data = envdat_by_month) +
+  geom_line() + geom_smooth()
+p3 <- ggplot(aes(x = year, y = max_air_temp_mean), data = envdat_by_year) +
+  geom_line() + geom_smooth()
+
+grid.arrange(p1, p2, p3, ncol = 1)
+```
+
+### Correlations of max air temp with month and year
+```{r}
+cor.test(envdat_by_month$yr_mo, envdat_by_month$max_air_temp_mean, method = 'pearson')
+cor.test(envdat_by_year$year, envdat_by_year$max_air_temp_mean, method = 'pearson')
+```

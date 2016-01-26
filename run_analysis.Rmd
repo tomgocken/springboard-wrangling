@@ -31,22 +31,22 @@ library(dplyr)
 
 ```{r}
 airtemp <- mutate(airtemp, heat_index = 
-                  type.convert(as.character(Avg.Daily.Max.Heat.Index..F.), 
-                  na.strings = "Missing")
-                  )                                          
+                    type.convert(as.character(Avg.Daily.Max.Heat.Index..F.), 
+                                 na.strings = "Missing"))                                          
+
 surfacetemp <- mutate(surfacetemp, day_surface_temp = 
-                  type.convert(as.character(Avg.Day.Land.Surface.Temperature..F.), 
-                  na.strings = "Missing"),
-                  night_surface_temp =
-                  type.convert(as.character(Avg.Night.Land.Surface.Temperature..F.), 
-                  na.strings = "Missing")
-                  )
+                        type.convert(as.character(
+                          Avg.Day.Land.Surface.Temperature..F.), 
+                          na.strings = "Missing"),
+                      night_surface_temp = type.convert(as.character(
+                        Avg.Night.Land.Surface.Temperature..F.), 
+                        na.strings = "Missing"))
 ```
 
 Note: The same result could have been accomplished using **gsub** function:
 
-    airtemp <- mutate(airtemp, heat_index = as.numeric(gsub("Missing", NA, 
-    as.character((airtemp$Avg.Daily.Max.Heat.Index..F.)))))
+    airtemp <- mutate(airtemp, heat_index = as.numeric(gsub("Missing", 
+    NA, as.character((airtemp$Avg.Daily.Max.Heat.Index..F.)))))
 
 ### Step 3: Join data into a single tidy dataset
 - Rows from individual datasets represent unique county/date observations. To ensure that all rows from every dataset were included in the combined dataset, full joins were used.
@@ -71,6 +71,7 @@ Select statement used to assign concise variable names in common format to colum
 envdat <- select(joindat,
                  county = County,
                  year = Year,
+                 month = Month.Code,
                  day_of_yr = Day.of.Year,
                  date,
                  max_air_temp = Avg.Daily.Max.Air.Temperature..F.,
@@ -99,8 +100,10 @@ http://agron-www.agron.iastate.edu/Courses/agron212/Calculations/GDD.htm
 envdat <- mutate(envdat, gdu = ifelse(max_air_temp < 50, 0,
                  (((ifelse(max_air_temp > 86, 86, max_air_temp) 
                  + ifelse(min_air_temp < 50, 50, min_air_temp)) / 2) - 50)))
+
 envdat <- transform(envdat, agdu = ave(gdu, paste(county, year), 
                                        FUN = cumsum))
+
 ```
 
 ### Step 4: Summarize and view data
@@ -128,6 +131,7 @@ county_means <- envdat %>%
   filter(day_of_yr != 366) %>% # exclude extra leap year day
   group_by(county, day_of_yr) %>%
   summarize(agdu_mean = mean(agdu))
+
 qplot(day_of_yr, agdu_mean, data = county_means, geom = "line", color = county, 
       xlab = "Day of Year", ylab = "Mean Accumulated GDUs") + geom_line(size = 1.0)
 ```
@@ -142,6 +146,7 @@ yr_means <- envdat %>%
   filter(day_of_yr != 366) %>% # exclude extra leap year day
   group_by(yr_group, day_of_yr) %>%
   summarize(agdu_mean = mean(agdu))
+
 qplot(day_of_yr, agdu_mean, data = yr_means, geom = "line", 
       color = yr_group, xlab = "Day of Year", 
       ylab = "Mean Accumulated GDUs") + geom_line(size = 1.0)

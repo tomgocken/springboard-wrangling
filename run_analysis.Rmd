@@ -9,15 +9,16 @@ output:
     fig_width: 7
 ---
 
-### Step 1: Load datasets
+### Step 1: Load CDC environmental datasets
 - Data for counties of interest was queried from http://wonder.cdc.gov/EnvironmentalData.html
 - Each environmental data type was downloaded in its own tab-delimited file and a dataset was created for each file.
 ```{r}
-airtemp <- read.delim("data/Air Temperature.txt")
-precip <- read.delim("data/Precipitation.txt")
-sunlight <- read.delim("data/Sunlight.txt")
-surfacetemp <- read.delim("data/Surface Temperature.txt")
-particulate <- read.delim("data/Particulate Matter.txt")
+setwd("C:/Projects/springboard-wrangling")
+airtemp <- read.delim("../data/Air Temperature.txt")
+precip <- read.delim("../data/Precipitation.txt")
+sunlight <- read.delim("../data/Sunlight.txt")
+surfacetemp <- read.delim("../data/Surface Temperature.txt")
+particulate <- read.delim("../data/Particulate Matter.txt")
 ```
 
 ### Step 2: Manage NA's
@@ -48,18 +49,28 @@ Note: The same result could have been accomplished using **gsub** function:
     airtemp <- mutate(airtemp, heat_index = as.numeric(gsub("Missing", 
     NA, as.character((airtemp$Avg.Daily.Max.Heat.Index..F.)))))
 
-### Step 3: Join data into a single tidy dataset
-- Rows from individual datasets represent unique county/date observations. To ensure that all rows from every dataset were included in the combined dataset, full joins were used.
-- Except for environmental data columns, variables were named consistently in downloaded files. As a result, natural joins on all variables with common names were possible without the need for a "by" argument.
-
-
+### Step 3: Load and reshape monthly ERSST data measuring El Nino / La Nina effects
+- Historical El Nino/ La Nina data source: http://www.cpc.noaa.gov/products/analysis_monitoring/ensostuff/ensoyears.shtml
 ```{r}
-joindat <- full_join(airtemp, precip)
-joindat <- full_join(joindat, sunlight)
-joindat <- full_join(joindat, surfacetemp)
-joindat <- full_join(joindat, particulate)
+el_nino <- read.csv("../data/el_nino.csv")
+el_nino <- rename(el_nino, year = Year, "1" = DJF, "2" = JFM, "3" = FMA, "4" = MAM, "5" = AMJ, "6" = MJJ, 
+                  "7" = JJA, "8" = JAS, "9" = ASO, "10" = SON, "11" = OND, "12" = NDJ)
 ```
-Date variable was created by concatenating year, month, and day columns and coverting to date class.
+- Gather monthly data into single column using **tidyr** package
+```{r}
+el_nino2 <- tidyr::gather(el_nino, "month", "ersst", 2:13)
+el_nino2 <- mutate(el_nino2, month = as.integer(el_nino2$month))
+```
+
+### Step 4: Join data into a single tidy dataset
+```{r}
+joindat <- left_join(airtemp, precip)
+joindat <- left_join(joindat, sunlight)
+joindat <- left_join(joindat, surfacetemp)
+joindat <- left_join(joindat, particulate)
+joindat <- left_join(joindat, el_nino2, by = c("Year" = "year", "Month.Code" = "month"))
+```
+Date variable created by concatenating year, month, and day columns and coverting to date class.
 ```{r}
 joindat <- mutate(joindat, date = as.Date(paste(joindat$Year.Code, 
                                                 joindat$Month.Code, 
@@ -81,7 +92,8 @@ envdat <- select(joindat,
                  sunlight = Avg.Daily.Sunlight..KJ.m².,
                  day_surface_temp,
                  night_surface_temp,
-                 particulate_matter = Avg.Fine.Particulate.Matter..µg.m³.
+                 particulate_matter = Avg.Fine.Particulate.Matter..µg.m³.,
+                 ersst
                  )
 ```
 
@@ -106,7 +118,7 @@ envdat <- transform(envdat, agdu = ave(gdu, paste(county, year),
 
 ```
 
-### Step 4: Summarize and view data
+### Step 5: Summarize and view data
 ```{r}
 summary(envdat)
 ```
@@ -114,7 +126,6 @@ summary(envdat)
 Box plot and line graphs created using **ggplot2**.
 ```{r}
 library(ggplot2)
-
 ```
 
 Differences in max air temp by year and county (2009-2011):
@@ -150,4 +161,7 @@ yr_means <- envdat %>%
 qplot(day_of_yr, agdu_mean, data = yr_means, geom = "line", 
       color = yr_group, xlab = "Day of Year", 
       ylab = "Mean Accumulated GDUs") + geom_line(size = 1.0)
+
+# Save results for future use
+write.table(envdat, "../data/envdat.txt", sep = "\t")
 ```

@@ -3,13 +3,15 @@ title: "Temperature Plots"
 author: "Tom Gocken"
 date: "Tuesday, January 26, 2016"
 output:
+  html_document: default
   word_document:
     fig_width: 7
 ---
 
 ### Load previously created tidy dataset, envdat
 ```{r}
-envdat <- read.delim("C:/Projects/data/envdat.txt")
+setwd("C:/Projects/springboard-wrangling")
+envdat <- read.delim("../data/envdat.txt")
 ```
 
 ### Create by month and by year datasets

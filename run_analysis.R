@@ -1,52 +1,53 @@
-# ### Step 1: Load datasets
-# - Data for counties of interest was queried from http://wonder.cdc.gov/EnvironmentalData.html
-# - Each environmental data type was downloaded in its own tab-delimited file and a dataset was created for each file.
-airtemp <- read.delim("data/Air Temperature.txt")
-precip <- read.delim("data/Precipitation.txt")
-sunlight <- read.delim("data/Sunlight.txt")
-surfacetemp <- read.delim("data/Surface Temperature.txt")
-particulate <- read.delim("data/Particulate Matter.txt")
+# Data for counties of interest was queried from http://wonder.cdc.gov/EnvironmentalData.html
+setwd("C:/Projects/springboard-wrangling")
+airtemp <- read.delim("../data/Air Temperature.txt")
+precip <- read.delim("../data/Precipitation.txt")
+sunlight <- read.delim("../data/Sunlight.txt")
+surfacetemp <- read.delim("../data/Surface Temperature.txt")
+particulate <- read.delim("../data/Particulate Matter.txt")
 
-# ### Step 2: Manage NA's
-# - **dplyr** package loaded for wrangling functions.
 library(dplyr)
 
-# - Missing numeric values from certain columns in original files were populated with the string "Missing".
-# - "Missing" strings were converted to NA using **type.convert** function.
-
+# Replace "Missing" string with NA
 airtemp <- mutate(airtemp, heat_index = 
                     type.convert(as.character(Avg.Daily.Max.Heat.Index..F.), 
-                                 na.strings = "Missing")
-)                                          
+                                 na.strings = "Missing"))                                          
+
 surfacetemp <- mutate(surfacetemp, day_surface_temp = 
-                        type.convert(as.character(Avg.Day.Land.Surface.Temperature..F.), 
-                                     na.strings = "Missing"),
-                      night_surface_temp =
-                        type.convert(as.character(Avg.Night.Land.Surface.Temperature..F.), 
-                                     na.strings = "Missing")
-)
+                        type.convert(as.character(
+                          Avg.Day.Land.Surface.Temperature..F.), 
+                          na.strings = "Missing"),
+                      night_surface_temp = type.convert(as.character(
+                        Avg.Night.Land.Surface.Temperature..F.), 
+                        na.strings = "Missing"))
 
-# Note: The same result could have been accomplished using **gsub** function:
-# 
-#     airtemp <- mutate(airtemp, heat_index = as.numeric(gsub("Missing", NA, 
-#     as.character((airtemp$Avg.Daily.Max.Heat.Index..F.)))))
-# 
-# ### Step 3: Join data into a single tidy dataset
-# - Rows from individual datasets represent unique county/date observations. To ensure that all rows from every dataset were included in the combined dataset, full joins were used.
-# - Except for environmental data columns, variables were named consistently in downloaded files. As a result, natural joins on all variables with common names were possible without the need for a "by" argument.
+# Load and reshape monthly ERSST data measuring El Nino / La Nina effects
+# http://www.cpc.noaa.gov/products/analysis_monitoring/ensostuff/ensoyears.shtml
+el_nino <- read.csv("../data/el_nino.csv")
+el_nino <- rename(el_nino, year = Year, "1" = DJF, "2" = JFM, "3" = FMA, "4" = MAM, "5" = AMJ, "6" = MJJ, 
+                  "7" = JJA, "8" = JAS, "9" = ASO, "10" = SON, "11" = OND, "12" = NDJ)
 
-joindat <- full_join(airtemp, precip)
-joindat <- full_join(joindat, sunlight)
-joindat <- full_join(joindat, surfacetemp)
-joindat <- full_join(joindat, particulate)
+# Gather monthly data into single column using **tidyr** package
+el_nino2 <- tidyr::gather(el_nino, "month", "ersst", 2:13)
+el_nino2 <- mutate(el_nino2, month = as.integer(el_nino2$month))
 
-# Date variable was created by concatenating year, month, and day columns and coverting to date class.
-joindat <- mutate(joindat, date = as.Date(paste(joindat$Year.Code, joindat$Month.Code, 
-                                                joindat$Day.of.Month.Code, sep="-")))
-# Select statement used to assign consise variable names in common format to columms of interest.
+# Join data into a single tidy dataset
+joindat <- left_join(airtemp, precip)
+joindat <- left_join(joindat, sunlight)
+joindat <- left_join(joindat, surfacetemp)
+joindat <- left_join(joindat, particulate)
+joindat <- left_join(joindat, el_nino2, by = c("Year" = "year", "Month.Code" = "month"))
+
+# Date variable created by concatenating year, month, and day columns and coverting to date class.
+joindat <- mutate(joindat, date = as.Date(paste(joindat$Year.Code, 
+                                                joindat$Month.Code, 
+                                                joindat$Day.of.Month.Code, 
+                                                sep="-")))
+
 envdat <- select(joindat,
                  county = County,
                  year = Year,
+                 month = Month.Code,
                  day_of_yr = Day.of.Year,
                  date,
                  max_air_temp = Avg.Daily.Max.Air.Temperature..F.,
@@ -56,55 +57,51 @@ envdat <- select(joindat,
                  sunlight = Avg.Daily.Sunlight..KJ.m².,
                  day_surface_temp,
                  night_surface_temp,
-                 particulate_matter = Avg.Fine.Particulate.Matter..µg.m³.
+                 particulate_matter = Avg.Fine.Particulate.Matter..µg.m³.,
+                 ersst
 )
 
-# Growing degree units (GDUs), also known as growing degree days, were calculated by taking the average of the daily maximum and minimum temperatures compared to a base temperature, T(base), as follows:
-# 
-# GDU = ((T(max) + T(min)) / 2) - T(base)
-# 
-# where T(max) is equal to the maximum daily temperature but not greater than a defined upper limit and T(min) is equal to the maximum daily temperature but not less than the base temperature. The upper limit and base in this project were set to 50°F and 86°F (10°C and 50°C), respectively, typical values for corn.
-# 
-# Accumulated GDUs (AGDUs) were calculated using the **cumsum** function grouped by county and year and ordered by date. AGDUs provide a standard measure of accumulated heat during a growing season. The maturity of a plant variety is often expressed in AGDUs after planting, rather than days, since days to maturity vary by location and season.
-# 
-# References:  
-# http://en.wikipedia.org/wiki/Growing_degree-day  
-# http://agron-www.agron.iastate.edu/Courses/agron212/Calculations/GDD.htm
+# Growing degree units (GDUs) = ((T(max) + T(min)) / 2) - T(base)
 envdat <- mutate(envdat, gdu = ifelse(max_air_temp < 50, 0,
                                       (((ifelse(max_air_temp > 86, 86, max_air_temp) 
                                          + ifelse(min_air_temp < 50, 50, min_air_temp)) / 2) - 50)))
+
+# Accumulated GDUs (AGDUs)
 envdat <- transform(envdat, agdu = ave(gdu, paste(county, year), 
                                        FUN = cumsum))
 
-# ### Step 4: Summarize and view data
+# Summarize and view data
 summary(envdat)
-
-# Box plot and line graphs created using **ggplot2**.
 library(ggplot2)
 
-# Differences in max air temp by year and county:
+# Differences in max air temp by year and county (2009-2011):
 envdat_3yr <- filter(envdat, year %in% c(2009, 2010, 2011))
 envdat_3yr$year <- as.factor(envdat_3yr$year)
 qplot(county, max_air_temp, data = envdat_3yr, geom = "boxplot", 
       facets = year ~ .)
 
-# Differences in accumulated GDUs over years, by county:
-yr_means <- envdat %>%
+# Differences in accumulated GDUs by county, across years:
+county_means <- envdat %>%
   filter(day_of_yr != 366) %>% # exclude extra leap year day
   group_by(county, day_of_yr) %>%
   summarize(agdu_mean = mean(agdu))
-qplot(day_of_yr, agdu_mean, data = yr_means, geom = "line", color = county, 
+
+qplot(day_of_yr, agdu_mean, data = county_means, geom = "line", color = county, 
       xlab = "Day of Year", ylab = "Mean Accumulated GDUs") + geom_line(size = 1.0)
 
-# Differences in accumulated GDUs over counties, by 5-year means:
+# Differences in accumulated GDUs by 5-year means, across counties:
 envdat <- mutate(envdat, yr_group = ifelse(year < 1997, "1992-1996",
                                            ifelse(year < 2002, "1997-2001",
                                                   ifelse(year < 2007, "2002-2006",
                                                          "2007-2011"))))
-county_means <- envdat %>%
+yr_means <- envdat %>%
   filter(day_of_yr != 366) %>% # exclude extra leap year day
   group_by(yr_group, day_of_yr) %>%
   summarize(agdu_mean = mean(agdu))
-qplot(day_of_yr, agdu_mean, data = county_means, geom = "line", 
+
+qplot(day_of_yr, agdu_mean, data = yr_means, geom = "line", 
       color = yr_group, xlab = "Day of Year", 
       ylab = "Mean Accumulated GDUs") + geom_line(size = 1.0)
+
+# Save results for future use
+write.table(envdat, "../data/envdat.txt", sep = "\t")

@@ -24,8 +24,9 @@ surfacetemp <- mutate(surfacetemp, day_surface_temp =
 # Load and reshape monthly ERSST data measuring El Nino / La Nina effects
 # http://www.cpc.noaa.gov/products/analysis_monitoring/ensostuff/ensoyears.shtml
 el_nino <- read.csv("../data/el_nino.csv")
-el_nino <- rename(el_nino, year = Year, "1" = DJF, "2" = JFM, "3" = FMA, "4" = MAM, "5" = AMJ, "6" = MJJ, 
-                  "7" = JJA, "8" = JAS, "9" = ASO, "10" = SON, "11" = OND, "12" = NDJ)
+el_nino <- rename(el_nino, year = Year, "1" = DJF, "2" = JFM, "3" = FMA,
+                  "4" = MAM, "5" = AMJ, "6" = MJJ, "7" = JJA, "8" = JAS,
+                  "9" = ASO, "10" = SON, "11" = OND, "12" = NDJ)
 
 # Gather monthly data into single column using **tidyr** package
 el_nino2 <- tidyr::gather(el_nino, "month", "ersst", 2:13)
@@ -70,6 +71,9 @@ envdat <- mutate(envdat, gdu = ifelse(max_air_temp < 50, 0,
 envdat <- transform(envdat, agdu = ave(gdu, paste(county, year), 
                                        FUN = cumsum))
 
+# Save results for future use
+write.table(envdat, "../data/envdat.txt", sep = "\t")
+
 # Summarize and view data
 summary(envdat)
 library(ggplot2)
@@ -102,6 +106,3 @@ yr_means <- envdat %>%
 qplot(day_of_yr, agdu_mean, data = yr_means, geom = "line", 
       color = yr_group, xlab = "Day of Year", 
       ylab = "Mean Accumulated GDUs") + geom_line(size = 1.0)
-
-# Save results for future use
-write.table(envdat, "../data/envdat.txt", sep = "\t")

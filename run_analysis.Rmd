@@ -3,10 +3,10 @@ title: "Data Wrangling Project"
 author: "Tom Gocken"
 date: "Wednesday, January 20, 2016"
 output:
-  html_document: default
-  pdf_document: default
   word_document:
     fig_width: 7
+  pdf_document: default
+  html_document: default
 ---
 
 ### Step 1: Load CDC environmental datasets
@@ -50,11 +50,12 @@ Note: The same result could have been accomplished using **gsub** function:
     NA, as.character((airtemp$Avg.Daily.Max.Heat.Index..F.)))))
 
 ### Step 3: Load and reshape monthly ERSST data measuring El Nino / La Nina effects
-- Historical El Nino/ La Nina data source: http://www.cpc.noaa.gov/products/analysis_monitoring/ensostuff/ensoyears.shtml
+- Data source: http://www.cpc.noaa.gov/products/analysis_monitoring/ensostuff/ensoyears.shtml
 ```{r}
 el_nino <- read.csv("../data/el_nino.csv")
-el_nino <- rename(el_nino, year = Year, "1" = DJF, "2" = JFM, "3" = FMA, "4" = MAM, "5" = AMJ, "6" = MJJ, 
-                  "7" = JJA, "8" = JAS, "9" = ASO, "10" = SON, "11" = OND, "12" = NDJ)
+el_nino <- rename(el_nino, year = Year, "1" = DJF, "2" = JFM, "3" = FMA,
+                  "4" = MAM, "5" = AMJ, "6" = MJJ, "7" = JJA, "8" = JAS,
+                  "9" = ASO, "10" = SON, "11" = OND, "12" = NDJ)
 ```
 - Gather monthly data into single column using **tidyr** package
 ```{r}
@@ -116,6 +117,8 @@ envdat <- mutate(envdat, gdu = ifelse(max_air_temp < 50, 0,
 envdat <- transform(envdat, agdu = ave(gdu, paste(county, year), 
                                        FUN = cumsum))
 
+# Save results for future use
+write.table(envdat, "../data/envdat.txt", sep = "\t")
 ```
 
 ### Step 5: Summarize and view data
@@ -161,7 +164,4 @@ yr_means <- envdat %>%
 qplot(day_of_yr, agdu_mean, data = yr_means, geom = "line", 
       color = yr_group, xlab = "Day of Year", 
       ylab = "Mean Accumulated GDUs") + geom_line(size = 1.0)
-
-# Save results for future use
-write.table(envdat, "../data/envdat.txt", sep = "\t")
 ```

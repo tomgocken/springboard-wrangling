@@ -110,7 +110,9 @@ envdat <- select(joindat,
                  day_surface_temp,
                  night_surface_temp,
                  particulate_matter = Avg.Fine.Particulate.Matter..µg.m³.,
-                 ersst
+                 ersst,
+                 ersst_lag3mo,
+                 ersst_lag6mo
                  )
 ```
 

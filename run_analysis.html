@@ -171,7 +171,9 @@ el_nino_all &lt;- dplyr::left_join(el_nino_tidy, el_nino_lag3mo)</code></pre>
                  day_surface_temp,
                  night_surface_temp,
                  particulate_matter = Avg.Fine.Particulate.Matter..µg.m³.,
-                 ersst
+                 ersst,
+                 ersst_lag3mo,
+                 ersst_lag6mo
                  )</code></pre>
 <p>Growing degree units (GDUs), also known as growing degree days, were calculated by taking the average of the daily maximum and minimum temperatures compared to a base temperature, T(base), as follows:</p>
 <p>GDU = ((T(max) + T(min)) / 2) - T(base)</p>
@@ -223,13 +225,21 @@ write.table(envdat, &quot;../data/envdat.txt&quot;, sep = &quot;\t&quot;)</code>
 ##  3rd Qu.:20725   3rd Qu.: 81.42   3rd Qu.: 55.77     3rd Qu.:16.56     
 ##  Max.   :30876   Max.   :108.53   Max.   : 77.10     Max.   :55.30     
 ##                  NA's   :28644    NA's   :28042      NA's   :20090     
-##      ersst               gdu              agdu        
-##  Min.   :-1.60000   Min.   : 0.000   Min.   :   0.00  
-##  1st Qu.:-0.70000   1st Qu.: 0.000   1st Qu.:  83.41  
-##  Median : 0.00000   Median : 6.185   Median :1275.78  
-##  Mean   :-0.02597   Mean   : 9.547   Mean   :1577.38  
-##  3rd Qu.: 0.50000   3rd Qu.:18.200   3rd Qu.:2916.39  
-##  Max.   : 2.30000   Max.   :35.035   Max.   :4957.62  
+##      ersst           ersst_lag3mo        ersst_lag6mo     
+##  Min.   :-1.60000   Min.   :-1.600000   Min.   :-1.60000  
+##  1st Qu.:-0.70000   1st Qu.:-0.600000   1st Qu.:-0.60000  
+##  Median : 0.00000   Median : 0.000000   Median : 0.00000  
+##  Mean   :-0.02597   Mean   :-0.001164   Mean   : 0.01387  
+##  3rd Qu.: 0.50000   3rd Qu.: 0.500000   3rd Qu.: 0.50000  
+##  Max.   : 2.30000   Max.   : 2.300000   Max.   : 2.30000  
+##                                                           
+##       gdu              agdu        
+##  Min.   : 0.000   Min.   :   0.00  
+##  1st Qu.: 0.000   1st Qu.:  83.41  
+##  Median : 6.185   Median :1275.78  
+##  Mean   : 9.547   Mean   :1577.38  
+##  3rd Qu.:18.200   3rd Qu.:2916.39  
+##  Max.   :35.035   Max.   :4957.62  
 ## </code></pre>
 <p>Box plot and line graphs created using <strong>ggplot2</strong>.</p>
 <pre class="r"><code>library(ggplot2)</code></pre>

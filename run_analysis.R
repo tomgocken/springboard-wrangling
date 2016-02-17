@@ -24,20 +24,31 @@ surfacetemp <- mutate(surfacetemp, day_surface_temp =
 # Load and reshape monthly ERSST data measuring El Nino / La Nina effects
 # http://www.cpc.noaa.gov/products/analysis_monitoring/ensostuff/ensoyears.shtml
 el_nino <- read.csv("../data/el_nino.csv")
-el_nino <- rename(el_nino, year = Year, "1" = DJF, "2" = JFM, "3" = FMA,
-                  "4" = MAM, "5" = AMJ, "6" = MJJ, "7" = JJA, "8" = JAS,
-                  "9" = ASO, "10" = SON, "11" = OND, "12" = NDJ)
-
-# Gather monthly data into single column using **tidyr** package
-el_nino2 <- tidyr::gather(el_nino, "month", "ersst", 2:13)
-el_nino2 <- mutate(el_nino2, month = as.integer(el_nino2$month))
+el_nino <- dplyr::rename(el_nino, year = Year, "1" = DJF, "2" = JFM, "3" = FMA,
+                         "4" = MAM, "5" = AMJ, "6" = MJJ, "7" = JJA, "8" = JAS,
+                         "9" = ASO, "10" = SON, "11" = OND, "12" = NDJ)
+el_nino_tidy <- tidyr::gather(el_nino, "month", "ersst", 2:13)
+el_nino_tidy$month <- as.integer(el_nino_tidy$month)
+# Add 3 and 6 month lag variables
+el_nino_lag <- dplyr::mutate(el_nino_tidy,
+                             yr_lag3mo = as.integer(ifelse(month < 10, year, year + 1)),
+                             mo_lag3mo = as.integer(ifelse(month < 10, month + 3, month - 9)),
+                             yr_lag6mo = as.integer(ifelse(month < 7, year, year + 1)),
+                             mo_lag6mo = as.integer(ifelse(month < 7, month + 6, month - 6)))
+el_nino_lag3mo <- dplyr::select(el_nino_lag, year = yr_lag3mo,
+                                month = mo_lag3mo, ersst_lag3mo = ersst)
+el_nino_lag6mo <- dplyr::select(el_nino_lag, year = yr_lag6mo,
+                                month = mo_lag6mo, ersst_lag6mo = ersst)
+el_nino_all <- dplyr::left_join(el_nino_tidy, el_nino_lag3mo)
+el_nino_all <- dplyr::left_join(el_nino_all, el_nino_lag6mo)
+el_nino_all <- dplyr::arrange(el_nino_all, year, month)
 
 # Join data into a single tidy dataset
 joindat <- left_join(airtemp, precip)
 joindat <- left_join(joindat, sunlight)
 joindat <- left_join(joindat, surfacetemp)
 joindat <- left_join(joindat, particulate)
-joindat <- left_join(joindat, el_nino2, by = c("Year" = "year", "Month.Code" = "month"))
+joindat <- left_join(joindat, el_nino_all, by = c("Year" = "year", "Month.Code" = "month"))
 
 # Date variable created by concatenating year, month, and day columns and coverting to date class.
 joindat <- mutate(joindat, date = as.Date(paste(joindat$Year.Code, 
@@ -59,7 +70,9 @@ envdat <- select(joindat,
                  day_surface_temp,
                  night_surface_temp,
                  particulate_matter = Avg.Fine.Particulate.Matter..µg.m³.,
-                 ersst
+                 ersst,
+                 ersst_lag3mo,
+                 ersst_lag6mo
 )
 
 # Growing degree units (GDUs) = ((T(max) + T(min)) / 2) - T(base)

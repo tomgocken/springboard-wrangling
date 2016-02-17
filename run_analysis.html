@@ -71,6 +71,7 @@ img {
 <h3>Step 1: Load CDC environmental datasets</h3>
 <ul>
 <li>Data for counties of interest was queried from <a href="http://wonder.cdc.gov/EnvironmentalData.html" class="uri">http://wonder.cdc.gov/EnvironmentalData.html</a></li>
+<li>County coordinates from <a href="https://www.census.gov/geo/maps-data/data/gazetteer.html" class="uri">https://www.census.gov/geo/maps-data/data/gazetteer.html</a></li>
 <li>Each environmental data type was downloaded in its own tab-delimited file and a dataset was created for each file.</li>
 </ul>
 <pre class="r"><code>setwd(&quot;C:/Projects/springboard-wrangling&quot;)
@@ -78,7 +79,8 @@ airtemp &lt;- read.delim(&quot;../data/Air Temperature.txt&quot;)
 precip &lt;- read.delim(&quot;../data/Precipitation.txt&quot;)
 sunlight &lt;- read.delim(&quot;../data/Sunlight.txt&quot;)
 surfacetemp &lt;- read.delim(&quot;../data/Surface Temperature.txt&quot;)
-particulate &lt;- read.delim(&quot;../data/Particulate Matter.txt&quot;)</code></pre>
+particulate &lt;- read.delim(&quot;../data/Particulate Matter.txt&quot;)
+coordinates &lt;- read.delim(&quot;../data/County Coordinates.txt&quot;)</code></pre>
 </div>
 <div id="step-2-manage-nas" class="section level3">
 <h3>Step 2: Manage NA’s</h3>
@@ -111,14 +113,28 @@ NA, as.character((airtemp$Avg.Daily.Max.Heat.Index..F.)))))</code></pre>
 <li>Data source: <a href="http://www.cpc.noaa.gov/products/analysis_monitoring/ensostuff/ensoyears.shtml" class="uri">http://www.cpc.noaa.gov/products/analysis_monitoring/ensostuff/ensoyears.shtml</a></li>
 </ul>
 <pre class="r"><code>el_nino &lt;- read.csv(&quot;../data/el_nino.csv&quot;)
-el_nino &lt;- rename(el_nino, year = Year, &quot;1&quot; = DJF, &quot;2&quot; = JFM, &quot;3&quot; = FMA,
-                  &quot;4&quot; = MAM, &quot;5&quot; = AMJ, &quot;6&quot; = MJJ, &quot;7&quot; = JJA, &quot;8&quot; = JAS,
-                  &quot;9&quot; = ASO, &quot;10&quot; = SON, &quot;11&quot; = OND, &quot;12&quot; = NDJ)</code></pre>
+el_nino &lt;- dplyr::rename(el_nino, year = Year, &quot;1&quot; = DJF, &quot;2&quot; = JFM, &quot;3&quot; = FMA,
+                         &quot;4&quot; = MAM, &quot;5&quot; = AMJ, &quot;6&quot; = MJJ, &quot;7&quot; = JJA, &quot;8&quot; = JAS,
+                         &quot;9&quot; = ASO, &quot;10&quot; = SON, &quot;11&quot; = OND, &quot;12&quot; = NDJ)
+el_nino_tidy &lt;- tidyr::gather(el_nino, &quot;month&quot;, &quot;ersst&quot;, 2:13)
+el_nino_tidy$month &lt;- as.integer(el_nino_tidy$month)</code></pre>
 <ul>
-<li>Gather monthly data into single column using <strong>tidyr</strong> package</li>
+<li>Add 3 and 6 month lag variables</li>
 </ul>
-<pre class="r"><code>el_nino2 &lt;- tidyr::gather(el_nino, &quot;month&quot;, &quot;ersst&quot;, 2:13)
-el_nino2 &lt;- mutate(el_nino2, month = as.integer(el_nino2$month))</code></pre>
+<pre class="r"><code>el_nino_lag &lt;- dplyr::mutate(el_nino_tidy,
+                             yr_lag3mo = as.integer(ifelse(month &lt; 10, year, year + 1)),
+                             mo_lag3mo = as.integer(ifelse(month &lt; 10, month + 3, month - 9)),
+                             yr_lag6mo = as.integer(ifelse(month &lt; 7, year, year + 1)),
+                             mo_lag6mo = as.integer(ifelse(month &lt; 7, month + 6, month - 6)))
+el_nino_lag3mo &lt;- dplyr::select(el_nino_lag, year = yr_lag3mo,
+                                month = mo_lag3mo, ersst_lag3mo = ersst)
+el_nino_lag6mo &lt;- dplyr::select(el_nino_lag, year = yr_lag6mo,
+                                month = mo_lag6mo, ersst_lag6mo = ersst)
+el_nino_all &lt;- dplyr::left_join(el_nino_tidy, el_nino_lag3mo)</code></pre>
+<pre><code>## Joining by: c(&quot;year&quot;, &quot;month&quot;)</code></pre>
+<pre class="r"><code>el_nino_all &lt;- dplyr::left_join(el_nino_all, el_nino_lag6mo)</code></pre>
+<pre><code>## Joining by: c(&quot;year&quot;, &quot;month&quot;)</code></pre>
+<pre class="r"><code>el_nino_all &lt;- dplyr::arrange(el_nino_all, year, month)</code></pre>
 </div>
 <div id="step-4-join-data-into-a-single-tidy-dataset" class="section level3">
 <h3>Step 4: Join data into a single tidy dataset</h3>
@@ -130,7 +146,9 @@ el_nino2 &lt;- mutate(el_nino2, month = as.integer(el_nino2$month))</code></pre>
 <pre><code>## Joining by: c(&quot;Notes&quot;, &quot;County&quot;, &quot;County.Code&quot;, &quot;Year&quot;, &quot;Year.Code&quot;, &quot;Month&quot;, &quot;Month.Code&quot;, &quot;Day.of.Month&quot;, &quot;Day.of.Month.Code&quot;, &quot;Day.of.Year&quot;, &quot;Day.of.Year.Code&quot;)</code></pre>
 <pre class="r"><code>joindat &lt;- left_join(joindat, particulate)</code></pre>
 <pre><code>## Joining by: c(&quot;Notes&quot;, &quot;County&quot;, &quot;County.Code&quot;, &quot;Year&quot;, &quot;Year.Code&quot;, &quot;Month&quot;, &quot;Month.Code&quot;, &quot;Day.of.Month&quot;, &quot;Day.of.Month.Code&quot;, &quot;Day.of.Year&quot;, &quot;Day.of.Year.Code&quot;)</code></pre>
-<pre class="r"><code>joindat &lt;- left_join(joindat, el_nino2, by = c(&quot;Year&quot; = &quot;year&quot;, &quot;Month.Code&quot; = &quot;month&quot;))</code></pre>
+<pre class="r"><code>joindat &lt;- left_join(joindat, coordinates)</code></pre>
+<pre><code>## Joining by: c(&quot;County&quot;, &quot;County.Code&quot;)</code></pre>
+<pre class="r"><code>joindat &lt;- left_join(joindat, el_nino_all, by = c(&quot;Year&quot; = &quot;year&quot;, &quot;Month.Code&quot; = &quot;month&quot;))</code></pre>
 <p>Date variable created by concatenating year, month, and day columns and coverting to date class.</p>
 <pre class="r"><code>joindat &lt;- mutate(joindat, date = as.Date(paste(joindat$Year.Code, 
                                                 joindat$Month.Code, 
@@ -139,6 +157,8 @@ el_nino2 &lt;- mutate(el_nino2, month = as.integer(el_nino2$month))</code></pre>
 <p>Select statement used to assign concise variable names in common format to columms of interest.</p>
 <pre class="r"><code>envdat &lt;- select(joindat,
                  county = County,
+                 latitude = Latitude,
+                 longitude = Longitude,
                  year = Year,
                  month = Month.Code,
                  day_of_yr = Day.of.Year,
@@ -171,45 +191,45 @@ write.table(envdat, &quot;../data/envdat.txt&quot;, sep = &quot;\t&quot;)</code>
 <div id="step-5-summarize-and-view-data" class="section level3">
 <h3>Step 5: Summarize and view data</h3>
 <pre class="r"><code>summary(envdat)</code></pre>
-<pre><code>##                     county          year          month       
-##  Columbia County, WI   :7305   Min.   :1992   Min.   : 1.000  
-##  Darke County, OH      :7305   1st Qu.:1996   1st Qu.: 4.000  
-##  DeKalb County, IL     :7305   Median :2001   Median : 7.000  
-##  Iowa County, IA       :7305   Mean   :2001   Mean   : 6.523  
-##  Vanderburgh County, IN:7305   3rd Qu.:2006   3rd Qu.:10.000  
-##                                Max.   :2011   Max.   :12.000  
-##                                                               
-##    day_of_yr          date             max_air_temp     min_air_temp   
-##  Min.   :  1.0   Min.   :1992-01-01   Min.   :-16.81   Min.   :-34.48  
-##  1st Qu.: 92.0   1st Qu.:1996-12-31   1st Qu.: 41.12   1st Qu.: 28.58  
-##  Median :183.0   Median :2001-12-31   Median : 62.17   Median : 43.37  
-##  Mean   :183.1   Mean   :2001-12-31   Mean   : 59.32   Mean   : 42.48  
-##  3rd Qu.:274.0   3rd Qu.:2006-12-31   3rd Qu.: 78.13   3rd Qu.: 58.40  
-##  Max.   :366.0   Max.   :2011-12-31   Max.   :114.08   Max.   : 84.07  
-##                                                                        
-##    heat_index         precip           sunlight     day_surface_temp
-##  Min.   : 78.40   Min.   :  0.000   Min.   : 1450   Min.   : -8.23  
-##  1st Qu.: 84.10   1st Qu.:  0.000   1st Qu.: 8334   1st Qu.: 47.97  
-##  Median : 88.35   Median :  0.100   Median :14337   Median : 71.75  
-##  Mean   : 90.22   Mean   :  2.754   Mean   :14768   Mean   : 63.88  
-##  3rd Qu.: 94.80   3rd Qu.:  1.900   3rd Qu.:20725   3rd Qu.: 81.42  
-##  Max.   :128.49   Max.   :133.900   Max.   :30876   Max.   :108.53  
-##  NA's   :28356                                      NA's   :28644   
-##  night_surface_temp particulate_matter     ersst               gdu        
-##  Min.   :-26.27     Min.   : 0.00      Min.   :-1.60000   Min.   : 0.000  
-##  1st Qu.: 24.80     1st Qu.: 8.30      1st Qu.:-0.70000   1st Qu.: 0.000  
-##  Median : 42.29     Median :12.03      Median : 0.00000   Median : 6.185  
-##  Mean   : 39.20     Mean   :13.14      Mean   :-0.02597   Mean   : 9.547  
-##  3rd Qu.: 55.77     3rd Qu.:16.56      3rd Qu.: 0.50000   3rd Qu.:18.200  
-##  Max.   : 77.10     Max.   :55.30      Max.   : 2.30000   Max.   :35.035  
-##  NA's   :28042      NA's   :20090                                         
-##       agdu        
-##  Min.   :   0.00  
-##  1st Qu.:  83.41  
-##  Median :1275.78  
-##  Mean   :1577.38  
-##  3rd Qu.:2916.39  
-##  Max.   :4957.62  
+<pre><code>##                     county        latitude       longitude     
+##  Columbia County, WI   :7305   Min.   :38.02   Min.   :-92.06  
+##  Darke County, OH      :7305   1st Qu.:40.13   1st Qu.:-89.33  
+##  DeKalb County, IL     :7305   Median :41.68   Median :-88.77  
+##  Iowa County, IA       :7305   Mean   :41.04   Mean   :-88.47  
+##  Vanderburgh County, IN:7305   3rd Qu.:41.89   3rd Qu.:-87.59  
+##                                Max.   :43.47   Max.   :-84.62  
+##                                                                
+##       year          month          day_of_yr          date           
+##  Min.   :1992   Min.   : 1.000   Min.   :  1.0   Min.   :1992-01-01  
+##  1st Qu.:1996   1st Qu.: 4.000   1st Qu.: 92.0   1st Qu.:1996-12-31  
+##  Median :2001   Median : 7.000   Median :183.0   Median :2001-12-31  
+##  Mean   :2001   Mean   : 6.523   Mean   :183.1   Mean   :2001-12-31  
+##  3rd Qu.:2006   3rd Qu.:10.000   3rd Qu.:274.0   3rd Qu.:2006-12-31  
+##  Max.   :2011   Max.   :12.000   Max.   :366.0   Max.   :2011-12-31  
+##                                                                      
+##   max_air_temp     min_air_temp      heat_index         precip       
+##  Min.   :-16.81   Min.   :-34.48   Min.   : 78.40   Min.   :  0.000  
+##  1st Qu.: 41.12   1st Qu.: 28.58   1st Qu.: 84.10   1st Qu.:  0.000  
+##  Median : 62.17   Median : 43.37   Median : 88.35   Median :  0.100  
+##  Mean   : 59.32   Mean   : 42.48   Mean   : 90.22   Mean   :  2.754  
+##  3rd Qu.: 78.13   3rd Qu.: 58.40   3rd Qu.: 94.80   3rd Qu.:  1.900  
+##  Max.   :114.08   Max.   : 84.07   Max.   :128.49   Max.   :133.900  
+##                                    NA's   :28356                     
+##     sunlight     day_surface_temp night_surface_temp particulate_matter
+##  Min.   : 1450   Min.   : -8.23   Min.   :-26.27     Min.   : 0.00     
+##  1st Qu.: 8334   1st Qu.: 47.97   1st Qu.: 24.80     1st Qu.: 8.30     
+##  Median :14337   Median : 71.75   Median : 42.29     Median :12.03     
+##  Mean   :14768   Mean   : 63.88   Mean   : 39.20     Mean   :13.14     
+##  3rd Qu.:20725   3rd Qu.: 81.42   3rd Qu.: 55.77     3rd Qu.:16.56     
+##  Max.   :30876   Max.   :108.53   Max.   : 77.10     Max.   :55.30     
+##                  NA's   :28644    NA's   :28042      NA's   :20090     
+##      ersst               gdu              agdu        
+##  Min.   :-1.60000   Min.   : 0.000   Min.   :   0.00  
+##  1st Qu.:-0.70000   1st Qu.: 0.000   1st Qu.:  83.41  
+##  Median : 0.00000   Median : 6.185   Median :1275.78  
+##  Mean   :-0.02597   Mean   : 9.547   Mean   :1577.38  
+##  3rd Qu.: 0.50000   3rd Qu.:18.200   3rd Qu.:2916.39  
+##  Max.   : 2.30000   Max.   :35.035   Max.   :4957.62  
 ## </code></pre>
 <p>Box plot and line graphs created using <strong>ggplot2</strong>.</p>
 <pre class="r"><code>library(ggplot2)</code></pre>

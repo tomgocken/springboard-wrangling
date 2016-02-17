@@ -3,14 +3,15 @@ title: "Data Wrangling Project"
 author: "Tom Gocken"
 date: "Wednesday, January 20, 2016"
 output:
+  html_document: default
+  pdf_document: default
   word_document:
     fig_width: 7
-  pdf_document: default
-  html_document: default
 ---
 
 ### Step 1: Load CDC environmental datasets
 - Data for counties of interest was queried from http://wonder.cdc.gov/EnvironmentalData.html
+- County coordinates from https://www.census.gov/geo/maps-data/data/gazetteer.html
 - Each environmental data type was downloaded in its own tab-delimited file and a dataset was created for each file.
 ```{r}
 setwd("C:/Projects/springboard-wrangling")
@@ -19,6 +20,7 @@ precip <- read.delim("../data/Precipitation.txt")
 sunlight <- read.delim("../data/Sunlight.txt")
 surfacetemp <- read.delim("../data/Surface Temperature.txt")
 particulate <- read.delim("../data/Particulate Matter.txt")
+coordinates <- read.delim("../data/County Coordinates.txt")
 ```
 
 ### Step 2: Manage NA's
@@ -53,23 +55,35 @@ Note: The same result could have been accomplished using **gsub** function:
 - Data source: http://www.cpc.noaa.gov/products/analysis_monitoring/ensostuff/ensoyears.shtml
 ```{r}
 el_nino <- read.csv("../data/el_nino.csv")
-el_nino <- rename(el_nino, year = Year, "1" = DJF, "2" = JFM, "3" = FMA,
-                  "4" = MAM, "5" = AMJ, "6" = MJJ, "7" = JJA, "8" = JAS,
-                  "9" = ASO, "10" = SON, "11" = OND, "12" = NDJ)
+el_nino <- dplyr::rename(el_nino, year = Year, "1" = DJF, "2" = JFM, "3" = FMA,
+                         "4" = MAM, "5" = AMJ, "6" = MJJ, "7" = JJA, "8" = JAS,
+                         "9" = ASO, "10" = SON, "11" = OND, "12" = NDJ)
+el_nino_tidy <- tidyr::gather(el_nino, "month", "ersst", 2:13)
+el_nino_tidy$month <- as.integer(el_nino_tidy$month)
 ```
-- Gather monthly data into single column using **tidyr** package
+- Add 3 and 6 month lag variables
 ```{r}
-el_nino2 <- tidyr::gather(el_nino, "month", "ersst", 2:13)
-el_nino2 <- mutate(el_nino2, month = as.integer(el_nino2$month))
+el_nino_lag <- dplyr::mutate(el_nino_tidy,
+                             yr_lag3mo = as.integer(ifelse(month < 10, year, year + 1)),
+                             mo_lag3mo = as.integer(ifelse(month < 10, month + 3, month - 9)),
+                             yr_lag6mo = as.integer(ifelse(month < 7, year, year + 1)),
+                             mo_lag6mo = as.integer(ifelse(month < 7, month + 6, month - 6)))
+el_nino_lag3mo <- dplyr::select(el_nino_lag, year = yr_lag3mo,
+                                month = mo_lag3mo, ersst_lag3mo = ersst)
+el_nino_lag6mo <- dplyr::select(el_nino_lag, year = yr_lag6mo,
+                                month = mo_lag6mo, ersst_lag6mo = ersst)
+el_nino_all <- dplyr::left_join(el_nino_tidy, el_nino_lag3mo)
+el_nino_all <- dplyr::left_join(el_nino_all, el_nino_lag6mo)
+el_nino_all <- dplyr::arrange(el_nino_all, year, month)
 ```
-
 ### Step 4: Join data into a single tidy dataset
 ```{r}
 joindat <- left_join(airtemp, precip)
 joindat <- left_join(joindat, sunlight)
 joindat <- left_join(joindat, surfacetemp)
 joindat <- left_join(joindat, particulate)
-joindat <- left_join(joindat, el_nino2, by = c("Year" = "year", "Month.Code" = "month"))
+joindat <- left_join(joindat, coordinates)
+joindat <- left_join(joindat, el_nino_all, by = c("Year" = "year", "Month.Code" = "month"))
 ```
 Date variable created by concatenating year, month, and day columns and coverting to date class.
 ```{r}
@@ -82,6 +96,8 @@ Select statement used to assign concise variable names in common format to colum
 ```{r}
 envdat <- select(joindat,
                  county = County,
+                 latitude = Latitude,
+                 longitude = Longitude,
                  year = Year,
                  month = Month.Code,
                  day_of_yr = Day.of.Year,
